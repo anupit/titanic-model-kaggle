@@ -1,0 +1,268 @@
+## Titanic: Machine Learning from Disaster
+## Author : Anup N. Itware
+
+## Problem Statement :
+## It is your job to predict if a passenger survived the sinking of the Titanic or not. 
+## For each PassengerId in the test set, you must predict a 0 or 1 value for the Survived variable.
+
+## Using Logical Regression Model (As its a bbinary)
+
+## Data Overview
+
+## The data has been split into two groups:
+## training set (train.csv)
+## test set (test.csv)
+
+## There are three parts to my script as follows:
+  
+#Feature engineering
+#Missing value imputation
+#Prediction!
+  
+## Lets import training data
+
+train_data <- read.csv(file=file.choose(), stringsAsFactors = F)
+
+test_data <- read.csv(file=file.choose(),stringsAsFactors = F)
+
+titanic_data <- bind_rows(train_data,test_data) # bind training and test data
+
+# Load packages
+library('ggplot2') # visualization
+library('ggthemes') # visualization
+library('scales') # visualization
+library('dplyr') # data manipulation
+library('mice') # imputation
+
+# check data
+
+str(titanic_data)
+
+# Feature Engineering
+
+str(titanic_data)
+
+summary(titanic_data)
+
+titanic_data$Cabin[1:28]
+
+# The first character is the deck. For example:
+
+strsplit(full$Cabin[2], NULL)[[1]]
+
+strsplit(titanic_data$Cabin[4], NULL)[[1]][[1]]
+
+# Create a Deck variable. Get passenger deck A - F:
+
+titanic_data$Deck<-factor(sapply(titanic_data$Cabin, function(x) strsplit(x, NULL)[[1]][1]))
+
+View(titanic_data)
+table(is.na(titanic_data$Embarked))
+titanic_data[c(62, 830), 'Embarked']
+
+summary(titanic_data$Embarked)
+
+titanic_data[c(62, 830), 'Fare'][[1]][1]
+titanic_data[c(62, 830), 'Fare'][[1]][2]
+titanic_data[c(62, 830), 'Pclass'][[1]][1]
+titanic_data[c(62, 830), 'Pclass'][[1]][2]
+
+embark_fare <- titanic_data %>% filter(PassengerId != 62 & PassengerId != 830)
+ggplot(embark_fare, aes(x = Embarked, y = Fare, fill = factor(Pclass))) +
+  geom_boxplot() +
+  geom_hline(aes(yintercept=80), 
+             colour='red', linetype='dashed', lwd=2) +
+  scale_y_continuous(labels=dollar_format())
+
+# Since their fare was $80 for 1st class, they most likely embarked from 'C'
+
+titanic_data$Embarked[c(62, 830)] <- 'C'
+
+titanic_data[1044, ]
+
+table(is.na(titanic_data$Fare))
+
+summary(titanic_data$Fare)
+
+titanic_data$Fare<- ifelse(is.na(titanic_data$Fare), as.integer(mean(titanic_data[titanic_data$Pclass == '3' & titanic_data$Embarked == 'S', ]$Fare, na.rm = TRUE)),titanic_data$Fare)
+
+table(is.na(titanic_data$Fare))
+titanic_data[1044, ]
+
+# Dealing with missing age data
+
+sum(is.na(titanic_data$Age))
+
+# using MICE
+library('mice')
+
+factor_vars <- c('PassengerId','Pclass','Sex','Embarked')
+
+titanic_data[factor_vars] <- lapply(titanic_data[factor_vars], function(x) as.factor(x))
+
+# Set a random seed
+set.seed(129)
+
+# Perform mice imputation, excluding certain less-than-useful variables:
+mice_mod <- mice(titanic_data[, !names(titanic_data) %in% c('PassengerId','Name','Ticket','Cabin','Survived')], method='rf') 
+
+# Save the complete output 
+
+mice_output <- complete(mice_mod)
+
+# Plot age distributions
+par(mfrow=c(1,2))
+hist(titanic_data$Age, freq=F, main='Age: Original Data', 
+     col='darkgreen', ylim=c(0,0.04))
+hist(mice_output$Age, freq=F, main='Age: MICE Output', 
+     col='lightgreen', ylim=c(0,0.04))
+
+# Replace Age variable from the mice model.
+titanic_data$Age <- mice_output$Age
+
+# Show new number of missing Age values
+sum(is.na(titanic_data$Age))
+
+
+table(is.na(titanic_data$Deck))
+summary(titanic_data)
+
+md.pattern(titanic_data)
+
+# Prediction
+
+# Using Logical Regression
+
+# Deleting unnecessary columns containing NA
+
+titanic_data$Cabin <- NULL
+titanic_data$Deck <- NULL
+titanic_data$Ticket <- NULL
+titanic_data$PassengerId <- NULL
+titanic_data$Name <- NULL
+
+str(titanic_data)
+
+# Handeling Categorical Data
+
+titanic_data$Sex <- ifelse(titanic_data$Sex=="female",1,0)
+titanic_data$Embarked <- ifelse(titanic_data$Embarked=="C",1,ifelse(titanic_data$Embarked=="Q",2,3))
+titanic_data$Pclass <- ifelse(titanic_data$Pclass== "1", 1, ifelse(titanic_data$Pclass=='2',2,3))
+
+str(titanic_data)
+
+titanic_data[,-1] <- scale(titanic_data[,-1])
+
+library(corrplot)
+
+corrplot(cor(titanic_data), type = "upper",order = "hclust", tl.col = "black" )
+
+library(PerformanceAnalytics)
+
+chart.Correlation(titanic_data)
+
+# Splitting data back into training and test set
+
+train_data <- titanic_data[1:891,]
+test_data <- titanic_data[892:1309,]
+
+str(train_data)
+str(test_data)
+
+########### Building Model for Checking Accuracy using only Train Data
+
+# Splitting data for training and testing purpose
+
+set.seed(001)
+library(caTools)
+
+train_data$split<- sample.split(train_data$Survived, SplitRatio =0.7)
+train_data$split
+
+train_data_check <- train_data[train_data$split==TRUE,]
+train_data_check
+str(train_data_check)
+
+train_data_check$split <- NULL
+
+test_data_check <- train_data[train_data$split==FALSE,]
+str(test_data_check)
+
+test_data_check$split <- NULL
+
+str(train_data_check)
+str(test_data_check)
+
+# Model Creation
+
+T_model <- glm(formula = Survived ~., family = binomial, data = train_data_check)
+summary(T_model)
+
+## Predicting for Test Data
+
+T_result = predict(T_model, type = 'response', newdata = test_data_check)
+test_data_check$PredictedSurvived <- T_result
+str(test_data_check)
+
+getwd()
+setwd("F:/Data Science/R/Data")
+
+test_data_check[,c(1,9)]
+
+library(ggplot2)
+
+ggplot(test_data_check)+
+  geom_line(aes(x=seq(1,nrow(test_data_check)),y=Survived), color="black")+
+  geom_line(aes(x=seq(1,nrow(test_data_check)),y=PredictedSurvived), color="blue")
+
+test_data_check$PredictedSurvived <- ifelse(test_data_check$PredictedSurvived > 0.5, 1,0)
+test_data_check[,c(1,9)]
+
+ggplot(test_data_check)+
+  geom_line(aes(x=seq(1,nrow(test_data_check)),y=Survived), color="black")+
+  geom_line(aes(x=seq(1,nrow(test_data_check)),y=PredictedSurvived), color="blue")
+
+write.csv(test_data, file = "Titanic_result.csv", row.names = FALSE)
+
+## Model Evaluation -  Confusion Matrix
+
+conf_mat <- table(test_data_check$Survived,test_data_check$PredictedSurvived)
+conf_mat
+
+cat("Test Accuracy is ", sum(diag(conf_mat))/sum(conf_mat))
+
+########### Building Model for Final Result
+
+
+str(train_data)
+train_data$split <- NULL
+
+T_model <- glm(formula = Survived ~., family = binomial, data = train_data)
+summary(T_model)
+
+## Predicting for Test Data
+
+T_result = predict(T_model, type = 'response', newdata = test_data)
+test_data$PredictedSurvived <- T_result
+str(test_data)
+
+test_data$PredictedSurvived <- ifelse(test_data$PredictedSurvived > 0.5, 1,0)
+
+test_data[,9]
+
+# Save the prediction to a dataframe with two columns: PassengerId and Survived (prediction)
+
+Passenger_data <- read.csv(file=file.choose()) # As I deleted the column
+
+str(Passenger_data)
+
+View(Passenger_data)
+
+Prediction_op <- data.frame(PassengerID = Passenger_data$PassengerId, Survived = test_data$PredictedSurvived)
+
+View(Prediction_op)
+
+getwd()
+setwd("F:/Data Science/R/Data")
+
+write.csv(Prediction_op, file = "Titanic_result.csv", row.names = FALSE)
